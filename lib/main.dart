@@ -12,7 +12,7 @@ class RainRideApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.black,
         scaffoldBackgroundColor: Colors.black,
-        textTheme: TextTheme(bodyText2: TextStyle(color: Colors.white)),
+        textTheme: TextTheme(bodyMedium: TextStyle(color: Colors.white)),
       ),
       home: HomeScreen(),
     );
