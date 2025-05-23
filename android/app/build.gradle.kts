@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.example.rainride"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    //ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"        // ✅ Upgrade NDK version as recommended
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

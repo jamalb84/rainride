@@ -10,8 +10,16 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^0.13.6
-
+  flutter_typeahead: ^4.0.0
+  flutter_keyboard_visibility:
+    path: flutter_keyboard_visibility
   cupertino_icons: ^1.0.2
+
+dependency_overrides:
+  flutter_keyboard_visibility:
+    path: flutter_keyboard_visibility
+
+
 
 dev_dependencies:
   flutter_test:
@@ -19,3 +27,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+

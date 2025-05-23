@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'geocoding_service.dart';
 
 class AddRouteScreen extends StatefulWidget {
@@ -61,84 +62,56 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
             key: _formKey,
             child: ListView(
               children: [
-                TextFormField(
-                  initialValue: from,
-                  decoration: InputDecoration(labelText: 'From'),
-                  style: TextStyle(color: Colors.white),
-                  onSaved: (value) => from = value ?? '',
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                ),
-                SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.teal,
+                TypeAheadFormField<Map<String, dynamic>>(
+                  textFieldConfiguration: TextFieldConfiguration(
+                    decoration: InputDecoration(labelText: 'From'),
+                    controller: TextEditingController(text: from),
+                    style: TextStyle(color: Colors.white),
                   ),
-                  onPressed: () async {
-                    _formKey.currentState!.save();
-                    if (from.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Please enter a "From" location')),
-                      );
-                      return;
-                    }
+                  suggestionsCallback: (pattern) async {
                     final geo = GeocodingService();
-                    final coords = await geo.getCoordinatesFromPlace(from);
-                    if (coords != null) {
-                      setState(() {
-                        fromLat = coords['lat'];
-                        fromLon = coords['lon'];
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('From location found: (${fromLat!.toStringAsFixed(4)}, ${fromLon!.toStringAsFixed(4)})')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not find coordinates for "From"')),
-                      );
-                    }
+                    return await geo.getSuggestions(pattern);
                   },
-                  child: Text('Find From Coordinates'),
+                  itemBuilder: (context, suggestion) {
+                    return ListTile(
+                      title: Text(suggestion['name']),
+                    );
+                  },
+                  onSuggestionSelected: (suggestion) {
+                    setState(() {
+                      from = suggestion['name'];
+                      fromLat = suggestion['lat'];
+                      fromLon = suggestion['lon'];
+                    });
+                  },
+                  validator: (value) =>
+                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 SizedBox(height: 20),
-                TextFormField(
-                  initialValue: to,
-                  decoration: InputDecoration(labelText: 'To'),
-                  style: TextStyle(color: Colors.white),
-                  onSaved: (value) => to = value ?? '',
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                ),
-                SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.teal,
+                TypeAheadFormField<Map<String, dynamic>>(
+                  textFieldConfiguration: TextFieldConfiguration(
+                    decoration: InputDecoration(labelText: 'To'),
+                    controller: TextEditingController(text: to),
+                    style: TextStyle(color: Colors.white),
                   ),
-                  onPressed: () async {
-                    _formKey.currentState!.save();
-                    if (to.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Please enter a "To" location')),
-                      );
-                      return;
-                    }
+                  suggestionsCallback: (pattern) async {
                     final geo = GeocodingService();
-                    final coords = await geo.getCoordinatesFromPlace(to);
-                    if (coords != null) {
-                      setState(() {
-                        toLat = coords['lat'];
-                        toLon = coords['lon'];
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('To location found: (${toLat!.toStringAsFixed(4)}, ${toLon!.toStringAsFixed(4)})')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not find coordinates for "To"')),
-                      );
-                    }
+                    return await geo.getSuggestions(pattern);
                   },
-                  child: Text('Find To Coordinates'),
+                  itemBuilder: (context, suggestion) {
+                    return ListTile(
+                      title: Text(suggestion['name']),
+                    );
+                  },
+                  onSuggestionSelected: (suggestion) {
+                    setState(() {
+                      to = suggestion['name'];
+                      toLat = suggestion['lat'];
+                      toLon = suggestion['lon'];
+                    });
+                  },
+                  validator: (value) =>
+                  value == null || value.isEmpty ? 'Required' : null,
                 ),
                 SizedBox(height: 20),
                 TextFormField(
@@ -149,7 +122,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                   onSaved: (value) => startHour = int.tryParse(value ?? ''),
                   validator: (value) {
                     final val = int.tryParse(value ?? '');
-                    return (val == null || val < 0 || val > 23) ? 'Enter hour (0-23)' : null;
+                    return (val == null || val < 0 || val > 23)
+                        ? 'Enter hour (0-23)'
+                        : null;
                   },
                 ),
                 SizedBox(height: 16),
@@ -161,7 +136,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                   onSaved: (value) => endHour = int.tryParse(value ?? ''),
                   validator: (value) {
                     final val = int.tryParse(value ?? '');
-                    return (val == null || val < 0 || val > 23) ? 'Enter hour (0-23)' : null;
+                    return (val == null || val < 0 || val > 23)
+                        ? 'Enter hour (0-23)'
+                        : null;
                   },
                 ),
                 SizedBox(height: 24),
@@ -175,7 +152,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       _formKey.currentState!.save();
                       if (fromLat == null || fromLon == null || toLat == null || toLon == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Please find both From and To coordinates first')),
+                          SnackBar(content: Text('Please select locations from suggestions')),
                         );
                         return;
                       }
