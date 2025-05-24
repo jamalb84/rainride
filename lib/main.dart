@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'add_route_screen.dart';
-import 'route_weather_service.dart';
+import 'weather_service.dart';
 
 void main() {
   runApp(RainRideApp());
@@ -23,60 +23,85 @@ class RainRideApp extends StatelessWidget {
 
 class HomeScreen extends StatefulWidget {
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Map<String, dynamic>> routes = [
+  List<Map<String, dynamic>> routes = [
     {
       'from': 'Home',
       'to': 'Office',
       'lat': 3.1390,
       'lon': 101.6869,
-      'toLat': 3.0738,
-      'toLon': 101.5183,
       'startHour': 6,
       'endHour': 8,
     },
     {
       'from': 'Home',
       'to': 'Gym',
-      'lat': 3.1200,
-      'lon': 101.7000,
-      'toLat': 3.0433,
-      'toLon': 101.5806,
+      'lat': 3.1215,
+      'lon': 101.6731,
       'startHour': 17,
       'endHour': 18,
     },
   ];
+
+  void _addRoute(Map<String, dynamic> newRoute, {int? routeIndex}) {
+    setState(() {
+      if (routeIndex != null) {
+        routes[routeIndex] = newRoute;
+      } else {
+        routes.add(newRoute);
+      }
+    });
+  }
+
+  void _editRoute(int index) async {
+    final updatedRoute = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddRouteScreen(
+          existingRoute: routes[index],
+          routeIndex: index,
+        ),
+      ),
+    );
+
+    if (updatedRoute != null) {
+      _addRoute(updatedRoute, routeIndex: index);
+    }
+  }
+
+  void _deleteRoute(int index) {
+    setState(() {
+      routes.removeAt(index);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('RainRide')),
       body: ListView.builder(
-        padding: EdgeInsets.all(16),
         itemCount: routes.length,
         itemBuilder: (context, index) {
           final route = routes[index];
           return Card(
             color: Colors.grey[900],
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
               title: Text('${route['from']} → ${route['to']}'),
               subtitle: Text('Time: ${route['startHour']}:00 - ${route['endHour']}:00'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                    child: Text('Check'),
+                  IconButton(
+                    icon: Icon(Icons.check),
                     onPressed: () async {
-                      final weatherService = RouteWeatherService();
-                      final result = await weatherService.checkRainAlongRoute(
-                        fromLat: route['lat'],
-                        fromLon: route['lon'],
-                        toLat: route['toLat'],
-                        toLon: route['toLon'],
+                      final weatherService = WeatherService();
+                      final rainExpected = await weatherService.willItRain(
+                        lat: route['lat'],
+                        lon: route['lon'],
                         startHour: route['startHour'],
                         endHour: route['endHour'],
                       );
@@ -85,39 +110,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         context: context,
                         builder: (_) => AlertDialog(
                           title: Text('Rain Forecast'),
-                          content: Text('Route Status: $result'),
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(Icons.edit, color: Colors.white),
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddRouteScreen(
-                            existingRoute: route,
-                            routeIndex: index,
+                          content: Text(
+                            rainExpected
+                                ? 'Rain is expected on your way to ${route['to']}.'
+                                : 'No rain expected on your way to ${route['to']}.',
                           ),
                         ),
                       );
-
-                      if (result != null && result['data'] != null) {
-                        setState(() {
-                          routes[result['index']] = result['data'];
-                        });
-                      }
                     },
                   ),
                   IconButton(
-                    icon: Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: () {
-                      setState(() {
-                        routes.removeAt(index);
-                      });
-                    },
+                    icon: Icon(Icons.edit),
+                    onPressed: () => _editRoute(index),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => _deleteRoute(index),
                   ),
                 ],
               ),
@@ -126,20 +134,17 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
         onPressed: () async {
           final newRoute = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => AddRouteScreen()),
           );
 
-          if (newRoute != null && newRoute['data'] != null) {
-            setState(() {
-              routes.add(newRoute['data']);
-            });
+          if (newRoute != null) {
+            _addRoute(newRoute);
           }
         },
-        child: Icon(Icons.add),
-        backgroundColor: Colors.teal,
       ),
     );
   }

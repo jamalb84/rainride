@@ -1,49 +1,40 @@
+//6831be12eb410024805231zwde1d9f3
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class GeocodingService {
-  final String apiKey = '5a74c42f591049aba41c40e7405e88bb'; // Replace with your real key
+  final String apiKey = '6831be12eb410024805231zwde1d9f3'; // <-- Replace this with your actual key
 
   Future<Map<String, double>?> getCoordinatesFromPlace(String place) async {
     final url = Uri.parse(
-      'https://api.opencagedata.com/geocode/v1/json?q=$place&key=$apiKey&limit=1',
-    );
-
+        'https://geocode.maps.co/search?q=$place&api_key=$apiKey');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['results'].isNotEmpty) {
-        final geometry = data['results'][0]['geometry'];
-        return {
-          'lat': geometry['lat'],
-          'lon': geometry['lng'],
-        };
+      final List data = jsonDecode(response.body);
+      if (data.isNotEmpty) {
+        final first = data.first;
+        final lat = double.tryParse(first['lat']);
+        final lon = double.tryParse(first['lon']);
+        if (lat != null && lon != null) {
+          return {'lat': lat, 'lon': lon};
+        }
       }
     }
 
     return null;
   }
 
-  Future<List<Map<String, dynamic>>> getSuggestions(String query) async {
+  Future<List<String>> suggestLocations(String pattern) async {
     final url = Uri.parse(
-      'https://api.opencagedata.com/geocode/v1/json?q=$query&key=$apiKey&limit=5',
-    );
-
+        'https://geocode.maps.co/search?q=$pattern&api_key=$apiKey');
     final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final results = data['results'] as List;
 
-      return results.map((item) {
-        return {
-          'name': item['formatted'],
-          'lat': item['geometry']['lat'],
-          'lon': item['geometry']['lng'],
-        };
-      }).toList();
-    } else {
-      return [];
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map<String>((item) => item['display_name'].toString()).toList();
     }
+
+    return [];
   }
 }
