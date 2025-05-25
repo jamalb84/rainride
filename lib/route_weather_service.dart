@@ -46,7 +46,6 @@ class RouteWeatherService {
         _cityNameCache[coordKey] = cityName;
       }
 
-
       if (cityName == null || cityName.isEmpty || seen.contains(cityName)) continue;
       seen.add(cityName);
 

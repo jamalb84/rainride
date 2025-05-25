@@ -1,72 +1,67 @@
 # RainRide
 
-RainRide is a smart weather-checking app designed specifically for **motorcyclists**. It helps you avoid rain on your daily commute by checking the weather not only at your starting point and destination—but **along the entire route**.
+**RainRide** is a mobile app built to help motorcyclists plan smarter, safer commutes by checking rain forecasts not just at the start and end points, but across all major cities in between.
 
-## 🚀 Features
 
-### ✅ For All Users
+## 🌦️ Features
 
-* **Route-Based Rain Check**: Predicts if it will rain between two locations during a custom time window.
-* **Smart City Detection**: Identifies major cities along your route and checks each one for rain.
-* **Quick Route Add**: Save frequently used commutes like Home → Office.
-* **Favorite Places**: Save "Home", "Office", or "Gym" for quick access.
-* **Auto-Complete for Location Input**: Suggests place names while you type.
-* **Dark Mode Theme**: Designed with a sleek, motorcyclist-inspired dark theme.
-* **Bottom Tab Navigation**: Familiar layout like Instagram/TikTok with quick access to features.
+### For All Users:
+- Set your commute route using location names with autocomplete support.
+- Define custom start and end hours (including overnight commutes).
+- Automatically checks weather conditions for cities along your route using OpenWeatherMap API.
+- Identifies rain risks, classifies final commute score (Low / Moderate / High).
+- View a scrollable result popup with copy-to-clipboard support.
+- Keeps a history of previously searched routes, even after app restarts.
+- Simple and responsive UI with dark theme and pastel-inspired highlights.
 
-### 🔐 Premium Features (Coming Soon)
+### Premium (Coming Soon):
+- Route suggestion with alternate paths to avoid rain.
+- Advanced analytics and hourly rain breakdown.
+- Push notifications for urgent weather alerts (e.g., flash floods).
+- Integration with real-time traffic data.
 
-* **Confidence Score**: Calculates an overall route rain score based on multiple cities.
-* **Alternate Routes**: Suggests better paths to avoid rain.
-* **Best Departure Time Suggestions**: Recommends optimal time to leave based on weather.
-* **Built-in Notifications**: Sends alerts before commute if rain is expected.
-* **Multiple Notification Times**: Customize more than one rain-check window.
+## 🧪 APIs Used
 
-## 📱 Screens
-
-* **Main Tab**: List of saved routes with check, edit, and delete buttons
-* **Add Tab**: Add new route with auto-complete, favorite saving, and time window
-* **About Tab**: App overview, contact, and GitHub link
-
-## 📦 Installation
-
-**Android APK (Beta)**
-
-* [Available on GitHub Repo](https://github.com/jamalb84/rainride)
-
-Clone this repo and run:
-
-```bash
-flutter pub get
-flutter run
-```
-
-Ensure you have:
-
-* Flutter SDK
-* Android Studio or emulator
-* API keys configured in `geocoding_service.dart` and `weather_service.dart`
+- [OpenRouteService](https://openrouteservice.org/) – for calculating the path between two locations.
+- [OpenWeatherMap One Call API 3.0](https://openweathermap.org/api/one-call-3) – to get hourly rain forecast.
+- [Maps.co Geocoding API](https://geocode.maps.co/) – to convert place names into coordinates.
 
 ## 🔧 Configuration
 
-1. **Geocoding API**: Maps.co API used to convert place names to coordinates
-2. **Weather API**: Open-Meteo used to get hourly weather forecast per city
-3. **Auto-Complete**: Location suggestions fetched live via Maps.co
+To run this app:
 
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/jamalb84/rainride.git
+   cd rainride
+   ```
 
-## 👤 Author
+2. Add your API keys in `route_weather_service.dart`:
+   ```dart
+   final String openRouteApiKey = 'YOUR_OPENROUTE_KEY';
+   final String openWeatherApiKey = 'YOUR_OPENWEATHER_KEY';
+   final String geocodeApiKey = 'YOUR_GEOCODE_KEY';
+   ```
 
-* Developed by **silv3r**
-* Email: [silv3r84@gmail.com](mailto:silv3r84@gmail.com)
-* GitHub: [github.com/jamalb84/rainride](https://github.com/jamalb84/rainride)
+3. Run it:
+   ```bash
+   flutter pub get
+   flutter run
+   ```
+
+## 📱 APK Build
+
+To build a release APK:
+```bash
+flutter build apk --release --no-tree-shake-icons
+```
+
+## 📬 Feedback & Bugs
+
+If you have feedback or found a bug, email the developer at:
+
+📧 silv3r84@gmail.com
 
 ---
 
-## 📌 Notes
-
-* Best used by daily riders, especially in cities with unpredictable weather.
-* APK is currently in **beta** — feedback is welcomed!
-
-Ride dry, ride smart 🌧️🏍️
-
-— RainRide Team
+Made with ❤️ for Malaysian riders — *Ride Dry, Ride Smart*.

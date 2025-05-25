@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ← Add this
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'add_route_screen.dart';
 import 'route_weather_service.dart';
 import 'package:flutter/gestures.dart';
@@ -36,6 +38,26 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadRoutes();
+  }
+
+  Future<void> _loadRoutes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedRoutes = prefs.getStringList('savedRoutes') ?? [];
+    setState(() {
+      routes = savedRoutes.map((r) => json.decode(r) as Map<String, dynamic>).toList();
+    });
+  }
+
+  Future<void> _saveRoutes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedRoutes = routes.map((r) => json.encode(r)).toList();
+    await prefs.setStringList('savedRoutes', savedRoutes);
+  }
+
   void _onTabTapped(int index) async {
     if (index == 1) {
       final newRoute = await Navigator.push(
@@ -46,6 +68,7 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           routes.add(newRoute);
         });
+        _saveRoutes();
       }
     } else {
       setState(() {
@@ -68,6 +91,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         routes[index] = updatedRoute;
       });
+      _saveRoutes();
     }
   }
 
@@ -78,23 +102,21 @@ class _MainScreenState extends State<MainScreen> {
         title: Text("Delete Route"),
         content: Text("Are you sure you want to delete this route?"),
         actions: [
-          TextButton(
-            child: Text("Cancel"),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          TextButton(
-            child: Text("Delete", style: TextStyle(color: Colors.red)),
-            onPressed: () => Navigator.pop(context, true),
-          ),
+          TextButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, false)),
+          TextButton(child: Text("Delete", style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(context, true)),
         ],
       ),
     );
-
     if (confirm == true) {
       setState(() {
         routes.removeAt(index);
       });
+      _saveRoutes();
     }
+  }
+
+  String _shorten(String name) {
+    return name.split(',').first.trim();
   }
 
   @override
@@ -159,19 +181,23 @@ class _MainScreenState extends State<MainScreen> {
       children: routes.asMap().entries.map((entry) {
         final index = entry.key;
         final route = entry.value;
+        final start = route['startHour'];
+        final end = route['endHour'];
+        final showNext = end <= start;
+
         return Card(
           color: Color(0xFF2C2C2E),
           margin: EdgeInsets.all(8.0),
           child: ListTile(
-            title: Text('${route['from']} → ${route['to']}', style: TextStyle(color: Colors.white)),
-            subtitle: Text('Time: ${route['startHour']}:00 - ${route['endHour']}:00', style: TextStyle(color: Colors.white70)),
+            title: Text('${_shorten(route['from'])} → ${_shorten(route['to'])}', style: TextStyle(color: Colors.white)),
+            subtitle: Text(
+              'Time: ${start.toString().padLeft(2, '0')}:00 - ${end.toString().padLeft(2, '0')}:00${showNext ? " (Next Day)" : ""}',
+              style: TextStyle(color: Colors.white70),
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.white),
-                  onPressed: () => _editRoute(index),
-                ),
+                IconButton(icon: Icon(Icons.edit, color: Colors.white), onPressed: () => _editRoute(index)),
                 IconButton(
                   icon: Icon(Icons.check_circle, color: Colors.white),
                   onPressed: () async {
@@ -181,21 +207,17 @@ class _MainScreenState extends State<MainScreen> {
                       );
                       return;
                     }
-
                     setState(() => _isLoading = true);
-
                     final service = RouteWeatherService();
                     final result = await service.checkRainAlongRoute(
                       fromLat: route['fromLat'],
                       fromLon: route['fromLon'],
                       toLat: route['toLat'],
                       toLon: route['toLon'],
-                      startHour: route['startHour'],
-                      endHour: route['endHour'],
+                      startHour: start,
+                      endHour: end,
                     );
-
                     setState(() => _isLoading = false);
-
                     showDialog(
                       context: context,
                       builder: (_) => AlertDialog(
@@ -224,10 +246,7 @@ class _MainScreenState extends State<MainScreen> {
                     );
                   },
                 ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () => _deleteRoute(index),
-                ),
+                IconButton(icon: Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _deleteRoute(index)),
               ],
             ),
           ),
@@ -237,11 +256,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildAboutSection() {
-    return Center(
+    return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Image.asset('assets/images/rainride_logo.png', height: 100),
             SizedBox(height: 20),
@@ -251,14 +271,14 @@ class _MainScreenState extends State<MainScreen> {
                   '📖 Visit the README on GitHub for full usage instructions.\n\n'
                   '🤝 Brought to you by silv3r\n'
                   '🔗 GitHub: github.com/jamalb84/rainride\n',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+              style: TextStyle(color: Colors.white70, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 20),
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: TextStyle(color: Colors.white70, fontSize: 16),
+                style: TextStyle(color: Colors.white70, fontSize: 14),
                 children: [
                   TextSpan(text: '🐞 Found a bug or have feedback?\n'),
                   TextSpan(text: 'Just '),

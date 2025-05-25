@@ -23,9 +23,12 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   double? _fromLat, _fromLon;
   double? _toLat, _toLon;
 
+  List<int> _startHourOptions = [];
+
   @override
   void initState() {
     super.initState();
+    _generateStartHourOptions();
     if (widget.existingRoute != null) {
       final route = widget.existingRoute!;
       _fromController.text = route['from'] ?? '';
@@ -37,6 +40,12 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
       _toLat = route['toLat'];
       _toLon = route['toLon'];
     }
+  }
+
+  void _generateStartHourOptions() {
+    final now = DateTime.now();
+    final currentHour = now.hour;
+    _startHourOptions = List.generate(24, (i) => (currentHour + i) % 24);
   }
 
   @override
@@ -76,25 +85,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              _buildHourDropdown(
-                label: 'Start Hour',
-                value: _startHour,
-                onChanged: (val) {
-                  setState(() {
-                    _startHour = val;
-                    if (_endHour != null && (_endHour! <= _startHour!)) {
-                      _endHour = null;
-                    }
-                  });
-                },
-              ),
+              _buildStartHourDropdown(),
               const SizedBox(height: 16),
-              _buildHourDropdown(
-                label: 'End Hour',
-                value: _endHour,
-                onChanged: (val) => setState(() => _endHour = val),
-                startHour: _startHour,
-              ),
+              _buildEndHourDropdown(),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
@@ -158,21 +151,65 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     );
   }
 
-  Widget _buildHourDropdown({
-    required String label,
-    required int? value,
-    required Function(int?) onChanged,
-    int? startHour,
-  }) {
-    final options = List.generate(24, (i) => i)
-        .where((h) => startHour == null || h > startHour)
-        .toList();
-
+  Widget _buildStartHourDropdown() {
     return DropdownButtonFormField<int>(
-      value: value,
+      value: _startHour,
       dropdownColor: const Color(0xFF2C2C2E),
       decoration: InputDecoration(
-        labelText: label,
+        labelText: 'Start Hour',
+        labelStyle: const TextStyle(color: Colors.white70),
+        filled: true,
+        fillColor: const Color(0xFF2C2C2E),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      style: const TextStyle(color: Colors.white),
+      items: _startHourOptions
+          .map((hour) => DropdownMenuItem(
+        value: hour,
+        child: Text('${hour.toString().padLeft(2, '0')}:00'),
+      ))
+          .toList(),
+      onChanged: (val) {
+        setState(() {
+          _startHour = val;
+          if (_endHour != null && (_endHour! <= _startHour!)) {
+            _endHour = null;
+          }
+        });
+      },
+      validator: (val) => val == null ? 'Required' : null,
+    );
+  }
+
+  Widget _buildEndHourDropdown() {
+    if (_startHour == null) {
+      return DropdownButtonFormField<int>(
+        value: _endHour,
+        items: [],
+        onChanged: null,
+        decoration: InputDecoration(
+          labelText: 'End Hour',
+          labelStyle: const TextStyle(color: Colors.white70),
+          filled: true,
+          fillColor: const Color(0xFF2C2C2E),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      );
+    }
+
+    final options = List.generate(24, (i) => (_startHour! + i + 1) % 24);
+
+    return DropdownButtonFormField<int>(
+      value: _endHour,
+      dropdownColor: const Color(0xFF2C2C2E),
+      decoration: InputDecoration(
+        labelText: 'End Hour',
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: const Color(0xFF2C2C2E),
@@ -188,8 +225,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         child: Text('${hour.toString().padLeft(2, '0')}:00'),
       ))
           .toList(),
-      onChanged: onChanged,
+      onChanged: (val) => setState(() => _endHour = val),
       validator: (val) => val == null ? 'Required' : null,
     );
   }
+
 }
