@@ -28,8 +28,8 @@ class RouteWeatherService {
     final routeCoords = await _getRouteCoordinates(fromLat, fromLon, toLat, toLon);
     if (routeCoords.isEmpty) return '⚠️ Could not retrieve route coordinates.';
 
-    List<String> rainyCities = [];
-    List<String> clearCities = [];
+    Set<String> rainyCities = {};
+    Set<String> clearCities = {};
 
     for (var point in routeCoords) {
       final lat = point['lat'];
@@ -41,7 +41,6 @@ class RouteWeatherService {
       if (cityName == null || cityName.isEmpty) continue;
 
       final rainChance = await _checkRainChance(lat, lon, startTime, endTime);
-
       if (rainChance != null) {
         rainyCities.add('$cityName ($rainChance%)');
       } else {
@@ -55,14 +54,15 @@ class RouteWeatherService {
 
     String result = '';
     if (rainyCities.isNotEmpty) {
-      result += '🌧️ Rain expected in ${rainyCities.length} cities:\n'
-          '- ${rainyCities.join("\n- ")}\n\n';
-    } else {
-      result += '✅ All clear — no rain expected along this route.\n\n';
+      result += '🌧️ Rain expected in ${rainyCities.length} cities:\n';
+      result += rainyCities.toList().map((city) => '- $city').join('\n');
+      result += '\n\n';
     }
 
     if (clearCities.isNotEmpty) {
-      result += '🟢 Clear cities checked:\n- ${clearCities.join("\n- ")}\n\n';
+      result += '✅ Clear cities:\n';
+      result += clearCities.toList().map((city) => '- $city').join('\n');
+      result += '\n\n';
     }
 
     result += '☁️ Final Commute Score: $risk';
@@ -93,7 +93,27 @@ class RouteWeatherService {
       final data = json.decode(response.body);
       final coords = data['features'][0]['geometry']['coordinates'] as List;
 
-      // Reduce points to one every ~10km
+      // Calculate route distance
+      double totalDistance = 0;
+      for (int i = 1; i < coords.length; i++) {
+        final lat1 = coords[i - 1][1];
+        final lon1 = coords[i - 1][0];
+        final lat2 = coords[i][1];
+        final lon2 = coords[i][0];
+        totalDistance += _haversineDistance(lat1, lon1, lat2, lon2);
+      }
+
+      // Decide sampling rate
+      double distanceThreshold;
+      if (totalDistance <= 50) {
+        distanceThreshold = 1.0; // more dense
+      } else if (totalDistance <= 100) {
+        distanceThreshold = 5.0;
+      } else {
+        distanceThreshold = 10.0;
+      }
+
+      // Filter points
       List<Map<String, double>> filtered = [];
       Map<String, double>? lastPoint;
 
@@ -105,7 +125,7 @@ class RouteWeatherService {
 
         if (lastPoint == null ||
             _haversineDistance(
-                lastPoint['lat']!, lastPoint['lon']!, point['lat']!, point['lon']!) > 10) {
+                lastPoint['lat']!, lastPoint['lon']!, point['lat']!, point['lon']!) >= distanceThreshold) {
           filtered.add(point);
           lastPoint = point;
         }
@@ -118,9 +138,7 @@ class RouteWeatherService {
   }
 
   Future<String?> _getCityName(double lat, double lon) async {
-    final url = Uri.parse(
-        'https://geocode.maps.co/reverse?lat=$lat&lon=$lon&api_key=6831be12eb410024805231zwde1d9f3'
-    );
+    final url = Uri.parse('https://geocode.maps.co/reverse?lat=$lat&lon=$lon&api_key=6831be12eb410024805231zwde1d9f3');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
@@ -135,9 +153,10 @@ class RouteWeatherService {
     return null;
   }
 
-  Future<int?> _checkRainChance(double lat, double lon, DateTime start, DateTime end) async {
+  Future<int?> _checkRainChance(
+      double lat, double lon, DateTime start, DateTime end) async {
     final url = Uri.parse(
-        'https://api.openweathermap.org/data/3.0/onecall?lat=$lat&lon=$lon&exclude=current,minutely,daily,alerts&appid=$openWeatherApiKey&units=metric'
+      'https://api.openweathermap.org/data/3.0/onecall?lat=$lat&lon=$lon&exclude=current,minutely,daily,alerts&appid=$openWeatherApiKey&units=metric',
     );
 
     final response = await http.get(url);
@@ -146,7 +165,8 @@ class RouteWeatherService {
       final hourly = data['hourly'] as List;
 
       for (var hour in hourly) {
-        final forecastTime = DateTime.fromMillisecondsSinceEpoch(hour['dt'] * 1000, isUtc: true);
+        final forecastTime =
+        DateTime.fromMillisecondsSinceEpoch(hour['dt'] * 1000, isUtc: true);
         if (forecastTime.isAfter(start) && forecastTime.isBefore(end)) {
           final weatherMain = hour['weather'][0]['main'].toLowerCase();
           final rainChance = hour['pop'] != null
