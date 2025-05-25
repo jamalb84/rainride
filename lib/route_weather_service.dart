@@ -11,6 +11,9 @@ class RouteWeatherService {
   final String openRouteApiKey = '5b3ce3597851110001cf6248b65aa4407799420099062a292bfbe853';
   final String openWeatherApiKey = 'dbbaeca20de6df241df924e351bdddbd';
 
+  final Map<String, String> _cityNameCache = {};
+  final Map<String, int?> _rainChanceCache = {};
+
   Future<String> checkRainAlongRoute({
     required double fromLat,
     required double fromLon,
@@ -28,19 +31,29 @@ class RouteWeatherService {
     final routeCoords = await _getRouteCoordinates(fromLat, fromLon, toLat, toLon);
     if (routeCoords.isEmpty) return '⚠️ Could not retrieve route coordinates.';
 
-    Set<String> rainyCities = {};
-    Set<String> clearCities = {};
+    List<String> rainyCities = [];
+    List<String> clearCities = [];
+    Set<String> seen = {};
 
     for (var point in routeCoords) {
       final lat = point['lat'];
       final lon = point['lon'];
-
       if (lat == null || lon == null) continue;
 
+      final coordKey = '$lat,$lon';
       final cityName = await _getCityName(lat, lon);
-      if (cityName == null || cityName.isEmpty) continue;
+      if (cityName != null && cityName.isNotEmpty) {
+        _cityNameCache[coordKey] = cityName;
+      }
 
-      final rainChance = await _checkRainChance(lat, lon, startTime, endTime);
+
+      if (cityName == null || cityName.isEmpty || seen.contains(cityName)) continue;
+      seen.add(cityName);
+
+      final rainKey = '$lat,$lon,$startHour-$endHour';
+      final rainChance = _rainChanceCache[rainKey] ?? await _checkRainChance(lat, lon, startTime, endTime);
+      _rainChanceCache[rainKey] = rainChance;
+
       if (rainChance != null) {
         rainyCities.add('$cityName ($rainChance%)');
       } else {
@@ -55,18 +68,16 @@ class RouteWeatherService {
     String result = '';
     if (rainyCities.isNotEmpty) {
       result += '🌧️ Rain expected in ${rainyCities.length} cities:\n';
-      result += rainyCities.toList().map((city) => '- $city').join('\n');
+      result += rainyCities.map((c) => '- $c').join("\n");
       result += '\n\n';
     }
-
     if (clearCities.isNotEmpty) {
       result += '✅ Clear cities:\n';
-      result += clearCities.toList().map((city) => '- $city').join('\n');
+      result += clearCities.map((c) => '- $c').join("\n");
       result += '\n\n';
     }
 
     result += '☁️ Final Commute Score: $risk';
-
     return result;
   }
 
@@ -93,27 +104,17 @@ class RouteWeatherService {
       final data = json.decode(response.body);
       final coords = data['features'][0]['geometry']['coordinates'] as List;
 
-      // Calculate route distance
-      double totalDistance = 0;
-      for (int i = 1; i < coords.length; i++) {
-        final lat1 = coords[i - 1][1];
-        final lon1 = coords[i - 1][0];
-        final lat2 = coords[i][1];
-        final lon2 = coords[i][0];
-        totalDistance += _haversineDistance(lat1, lon1, lat2, lon2);
-      }
+      final distance = _haversineDistance(fromLat, fromLon, toLat, toLon);
 
-      // Decide sampling rate
-      double distanceThreshold;
-      if (totalDistance <= 50) {
-        distanceThreshold = 1.0; // more dense
-      } else if (totalDistance <= 100) {
-        distanceThreshold = 5.0;
+      int pointInterval;
+      if (distance < 30) {
+        pointInterval = 1; // denser sampling: ~2 per km
+      } else if (distance < 70) {
+        pointInterval = 10; // 1 every ~10km
       } else {
-        distanceThreshold = 10.0;
+        pointInterval = 20; // 1 every ~20km
       }
 
-      // Filter points
       List<Map<String, double>> filtered = [];
       Map<String, double>? lastPoint;
 
@@ -125,7 +126,8 @@ class RouteWeatherService {
 
         if (lastPoint == null ||
             _haversineDistance(
-                lastPoint['lat']!, lastPoint['lon']!, point['lat']!, point['lon']!) >= distanceThreshold) {
+                lastPoint['lat']!, lastPoint['lon']!, point['lat']!, point['lon']!) >
+                pointInterval) {
           filtered.add(point);
           lastPoint = point;
         }
@@ -172,7 +174,9 @@ class RouteWeatherService {
           final rainChance = hour['pop'] != null
               ? (hour['pop'] * 100).round()
               : null;
-          if (weatherMain.contains('rain')) {
+          if (weatherMain.contains('rain') ||
+              weatherMain.contains('drizzle') ||
+              weatherMain.contains('shower')) {
             return rainChance;
           }
         }

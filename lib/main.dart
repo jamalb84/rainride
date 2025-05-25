@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ← Add this
 import 'add_route_screen.dart';
 import 'route_weather_service.dart';
 import 'package:flutter/gestures.dart';
@@ -203,6 +204,22 @@ class _MainScreenState extends State<MainScreen> {
                         content: SingleChildScrollView(
                           child: Text(result, style: TextStyle(color: Colors.white70)),
                         ),
+                        actions: [
+                          TextButton(
+                            child: Text('COPY', style: TextStyle(color: Color(0xFFFFC857))),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: result));
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Forecast copied to clipboard")),
+                              );
+                            },
+                          ),
+                          TextButton(
+                            child: Text('OK', style: TextStyle(color: Color(0xFFFFC857))),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -271,5 +288,4 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-
 }
