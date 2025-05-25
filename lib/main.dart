@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'add_route_screen.dart';
 import 'route_weather_service.dart';
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(RainRideApp());
@@ -230,13 +232,44 @@ class _MainScreenState extends State<MainScreen> {
               'RainRide helps motorcyclists plan smarter routes by checking for rain not just at the start and end, but all cities in between.\n\n'
                   'Ride Dry, Ride Smart\n\n'
                   '📖 Visit the README on GitHub for full usage instructions.\n\n'
-                  '🤝 Brought to you by silv3r\n📩 Contact: silv3r84@gmail.com\n🔗 GitHub: github.com/jamalb84/rainride',
+                  '🤝 Brought to you by silv3r\n'
+                  '🔗 GitHub: github.com/jamalb84/rainride\n',
               style: TextStyle(color: Colors.white70, fontSize: 16),
               textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 20),
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+                children: [
+                  TextSpan(text: '🐞 Found a bug or have feedback?\n'),
+                  TextSpan(text: 'Just '),
+                  TextSpan(
+                    text: 'email me here.',
+                    style: TextStyle(
+                      color: Color(0xFFFFC857),
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () async {
+                        final Uri emailUri = Uri(
+                          scheme: 'mailto',
+                          path: 'silv3r84@gmail.com',
+                          query: 'subject=RainRide Feedback or Bug Report',
+                        );
+                        if (await canLaunchUrl(emailUri)) {
+                          await launchUrl(emailUri);
+                        }
+                      },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
 }
