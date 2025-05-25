@@ -1,28 +1,15 @@
+//5b3ce3597851110001cf6248b65aa4407799420099062a292bfbe853 - openroute
+//dbbaeca20de6df241df924e351bdddbd -- openweather
+//6831be12eb410024805231zwde1d9f3 -- geocode
+
+// lib/route_weather_service.dart
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'dart:math';
+import 'package:http/http.dart' as http;
 
 class RouteWeatherService {
-  final String openRouteApiKey = '5b3ce3597851110001cf6248b65aa4407799420099062a292bfbe853'; // Replace with your key
-  final String openWeatherApiKey = 'dbbaeca20de6df241df924e351bdddbd';    // Replace with your key
-
-  final List<Map<String, dynamic>> klangValleyCities = [
-    {'name': 'Kuala Lumpur', 'lat': 3.1390, 'lon': 101.6869},
-    {'name': 'Petaling Jaya', 'lat': 3.1044, 'lon': 101.6400},
-    {'name': 'Subang Jaya', 'lat': 3.0433, 'lon': 101.5806},
-    {'name': 'Shah Alam', 'lat': 3.0738, 'lon': 101.5183},
-    {'name': 'Cheras', 'lat': 3.0851, 'lon': 101.7409},
-    {'name': 'Ampang', 'lat': 3.1617, 'lon': 101.7496},
-    {'name': 'Puchong', 'lat': 2.9990, 'lon': 101.6162},
-    {'name': 'Bangi', 'lat': 2.9446, 'lon': 101.7881},
-    {'name': 'Kajang', 'lat': 2.9935, 'lon': 101.7870},
-    {'name': 'Putrajaya', 'lat': 2.9264, 'lon': 101.6964},
-    {'name': 'Cyberjaya', 'lat': 2.9226, 'lon': 101.6507},
-    {'name': 'Seri Kembangan', 'lat': 3.0190, 'lon': 101.7070},
-    {'name': 'Setapak', 'lat': 3.1949, 'lon': 101.7180},
-    {'name': 'Gombak', 'lat': 3.2320, 'lon': 101.6926},
-    {'name': 'Selayang', 'lat': 3.2667, 'lon': 101.6500},
-  ];
+  final String openRouteApiKey = '5b3ce3597851110001cf6248b65aa4407799420099062a292bfbe853';
+  final String openWeatherApiKey = 'dbbaeca20de6df241df924e351bdddbd';
 
   Future<String> checkRainAlongRoute({
     required double fromLat,
@@ -34,41 +21,56 @@ class RouteWeatherService {
   }) async {
     final now = DateTime.now().toUtc();
     final startTime = now.copyWith(hour: startHour, minute: 0);
-    final endTime = now.copyWith(hour: endHour, minute: 0);
+    final endTime = endHour > startHour
+        ? now.copyWith(hour: endHour, minute: 0)
+        : now.add(Duration(days: 1)).copyWith(hour: endHour, minute: 0);
 
     final routeCoords = await _getRouteCoordinates(fromLat, fromLon, toLat, toLon);
-    if (routeCoords.isEmpty) return '⚠️ Could not retrieve route.';
+    if (routeCoords.isEmpty) return '⚠️ Could not retrieve route coordinates.';
 
     List<String> rainyCities = [];
+    List<String> clearCities = [];
 
-    for (var city in klangValleyCities) {
-      final match = routeCoords.any((point) {
-        final double distance = _haversineDistance(
-            city['lat'], city['lon'],
-            point['lat'] as double, point['lon'] as double
-        );
-        return distance <= 5.0;
-      });
+    for (var point in routeCoords) {
+      final lat = point['lat'];
+      final lon = point['lon'];
 
-      if (match) {
-        final rain = await _checkCityRain(city, startTime, endTime);
-        if (rain != null) rainyCities.add('${city['name']} (${rain}%)');
+      if (lat == null || lon == null) continue;
+
+      final cityName = await _getCityName(lat, lon);
+      if (cityName == null || cityName.isEmpty) continue;
+
+      final rainChance = await _checkRainChance(lat, lon, startTime, endTime);
+
+      if (rainChance != null) {
+        rainyCities.add('$cityName ($rainChance%)');
+      } else {
+        clearCities.add(cityName);
       }
     }
 
-    if (rainyCities.isEmpty) {
-      return '✅ All clear — no rain expected along this route.';
+    final risk = rainyCities.isEmpty
+        ? 'Low Risk'
+        : (rainyCities.length == 1 ? 'Moderate Risk' : 'High Risk');
+
+    String result = '';
+    if (rainyCities.isNotEmpty) {
+      result += '🌧️ Rain expected in ${rainyCities.length} cities:\n'
+          '- ${rainyCities.join("\n- ")}\n\n';
     } else {
-      final risk = rainyCities.length == 1
-          ? 'Low Risk'
-          : (rainyCities.length <= 3 ? 'Moderate Risk' : 'High Risk');
-      return '🌧️ Rain expected in ${rainyCities.length} cities:\n'
-          '- ${rainyCities.join('\n- ')}\n\n'
-          '☁️ Final Commute Score: $risk';
+      result += '✅ All clear — no rain expected along this route.\n\n';
     }
+
+    if (clearCities.isNotEmpty) {
+      result += '🟢 Clear cities checked:\n- ${clearCities.join("\n- ")}\n\n';
+    }
+
+    result += '☁️ Final Commute Score: $risk';
+
+    return result;
   }
 
-  Future<List<Map<String, dynamic>>> _getRouteCoordinates(
+  Future<List<Map<String, double>>> _getRouteCoordinates(
       double fromLat, double fromLon, double toLat, double toLon) async {
     final url = Uri.parse('https://api.openrouteservice.org/v2/directions/driving-car/geojson');
     final body = jsonEncode({
@@ -91,22 +93,54 @@ class RouteWeatherService {
       final data = json.decode(response.body);
       final coords = data['features'][0]['geometry']['coordinates'] as List;
 
-      return coords.map((c) => {'lon': c[0], 'lat': c[1]}).toList();
+      // Reduce points to one every ~10km
+      List<Map<String, double>> filtered = [];
+      Map<String, double>? lastPoint;
+
+      for (var coord in coords) {
+        final point = {
+          'lon': (coord[0] as num).toDouble(),
+          'lat': (coord[1] as num).toDouble(),
+        };
+
+        if (lastPoint == null ||
+            _haversineDistance(
+                lastPoint['lat']!, lastPoint['lon']!, point['lat']!, point['lon']!) > 10) {
+          filtered.add(point);
+          lastPoint = point;
+        }
+      }
+
+      return filtered;
     }
 
     return [];
   }
 
-  Future<int?> _checkCityRain(Map<String, dynamic> city, DateTime start, DateTime end) async {
-    final lat = city['lat'];
-    final lon = city['lon'];
-
+  Future<String?> _getCityName(double lat, double lon) async {
     final url = Uri.parse(
-      'https://api.openweathermap.org/data/3.0/onecall?lat=$lat&lon=$lon&exclude=current,minutely,daily,alerts&appid=$openWeatherApiKey&units=metric',
+        'https://geocode.maps.co/reverse?lat=$lat&lon=$lon&api_key=6831be12eb410024805231zwde1d9f3'
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['address']?['city'] ??
+          data['address']?['town'] ??
+          data['address']?['village'] ??
+          data['address']?['suburb'] ??
+          data['display_name'];
+    }
+
+    return null;
+  }
+
+  Future<int?> _checkRainChance(double lat, double lon, DateTime start, DateTime end) async {
+    final url = Uri.parse(
+        'https://api.openweathermap.org/data/3.0/onecall?lat=$lat&lon=$lon&exclude=current,minutely,daily,alerts&appid=$openWeatherApiKey&units=metric'
     );
 
     final response = await http.get(url);
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final hourly = data['hourly'] as List;
@@ -115,8 +149,9 @@ class RouteWeatherService {
         final forecastTime = DateTime.fromMillisecondsSinceEpoch(hour['dt'] * 1000, isUtc: true);
         if (forecastTime.isAfter(start) && forecastTime.isBefore(end)) {
           final weatherMain = hour['weather'][0]['main'].toLowerCase();
-          final rainChance = hour['pop'] != null ? (hour['pop'] * 100).round() : null;
-
+          final rainChance = hour['pop'] != null
+              ? (hour['pop'] * 100).round()
+              : null;
           if (weatherMain.contains('rain')) {
             return rainChance;
           }

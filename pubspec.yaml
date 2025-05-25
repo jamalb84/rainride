@@ -28,4 +28,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/rainride_logo.png
+    - assets/images/motorcycle_banner.jpg
 
